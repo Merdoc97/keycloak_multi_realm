@@ -1,0 +1,8 @@
+server:
+  port: 8082
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuers-uri: http://localhost:8081/auth/realms/master,http://localhost:8081/auth/realms/test-realm
