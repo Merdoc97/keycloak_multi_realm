@@ -27,7 +27,8 @@ import java.util.Map;
 class WebSecurityJwtConfiguration {
 
     @Value("${spring.security.oauth2.resourceserver.jwt.issuers-uri}")
-    private String[]issuers;
+    private String[] issuers;
+
     @Bean
     SecurityFilterChain configure(final HttpSecurity http) throws Exception {
         http
@@ -36,21 +37,15 @@ class WebSecurityJwtConfiguration {
                 .and()
                 .anonymous()
                 .and()
-                .authorizeHttpRequests((auth)->auth
+                .authorizeHttpRequests((auth) -> auth
                         .anyRequest().authenticated())
-                .oauth2ResourceServer(oauth2->oauth2
-                        .authenticationManagerResolver(byIssuer()));
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .authenticationManagerResolver(issuerResolver()));
 
         return http.build();
     }
 
-    JwtAuthenticationConverter jwtAuthenticationConverter() {
-        var converter = new JwtAuthenticationConverter();
-        converter.setJwtGrantedAuthoritiesConverter(new KeycloakRoleScopeConverter());
-        return converter;
-    }
-
-    JwtIssuerAuthenticationManagerResolver byIssuer() {
+    JwtIssuerAuthenticationManagerResolver issuerResolver() {
         Map<String, AuthenticationManager> managers = new HashMap<>();
         for (String issuer : issuers) {
             NimbusJwtDecoder decoder = JwtDecoders.fromIssuerLocation(issuer);
@@ -61,8 +56,14 @@ class WebSecurityJwtConfiguration {
         }
         return new JwtIssuerAuthenticationManagerResolver(managers::get);
     }
-    private static class UsernameSubClaimAdapter implements Converter<Map<String, Object>, Map<String, Object>> {
 
+    JwtAuthenticationConverter jwtAuthenticationConverter() {
+        var converter = new JwtAuthenticationConverter();
+        converter.setJwtGrantedAuthoritiesConverter(new KeycloakRoleScopeConverter());
+        return converter;
+    }
+
+    private static class UsernameSubClaimAdapter implements Converter<Map<String, Object>, Map<String, Object>> {
         private final MappedJwtClaimSetConverter delegate = MappedJwtClaimSetConverter.withDefaults(Collections.emptyMap());
 
         @Override
