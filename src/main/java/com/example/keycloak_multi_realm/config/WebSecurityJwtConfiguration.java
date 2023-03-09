@@ -47,11 +47,11 @@ class WebSecurityJwtConfiguration {
     }
 
     JwtIssuerAuthenticationManagerResolver issuerResolver() {
-        var managers = Arrays.stream(issuers)
+        final var managers = Arrays.stream(issuers)
                 .collect(Collectors.toMap(issuer -> issuer, issuer -> {
-                    NimbusJwtDecoder decoder = JwtDecoders.fromIssuerLocation(issuer);
+                    final NimbusJwtDecoder decoder = JwtDecoders.fromIssuerLocation(issuer);
                     decoder.setClaimSetConverter(new UsernameSubClaimAdapter());
-                    JwtAuthenticationProvider provider = new JwtAuthenticationProvider(decoder);
+                    final var provider = new JwtAuthenticationProvider(decoder);
                     provider.setJwtAuthenticationConverter(jwtAuthenticationConverter());
                     return createManager(provider);
                 }));

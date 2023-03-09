@@ -21,10 +21,10 @@ final class KeycloakRoleScopeConverter implements Converter<Jwt, Collection<Gran
                 .collect(Collectors.toList());
     }
 
-    private Stream<SimpleGrantedAuthority> getRoles(Jwt jwt) {
+    private Stream<SimpleGrantedAuthority> getRoles(final Jwt jwt) {
         return Optional.ofNullable(jwt)
-                .map(j -> castIfPresent(j.getClaim(REALM_ACCESS), Map.class))
-                .map(cl -> castIfPresent(cl.get(ROLES), List.class))
+                .map(token -> castIfPresent(token.getClaim(REALM_ACCESS), Map.class))
+                .map(claim -> castIfPresent(claim.get(ROLES), List.class))
                 .map(list -> list.stream()
                         .map(s -> new SimpleGrantedAuthority("ROLE_" + (String) s)))
                 .orElse(Stream.empty());
