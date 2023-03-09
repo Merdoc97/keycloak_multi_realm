@@ -17,9 +17,10 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.security.oauth2.server.resource.authentication.JwtIssuerAuthenticationManagerResolver;
 import org.springframework.security.web.SecurityFilterChain;
 
+import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Configuration
 @EnableWebSecurity
@@ -46,19 +47,23 @@ class WebSecurityJwtConfiguration {
     }
 
     JwtIssuerAuthenticationManagerResolver issuerResolver() {
-        Map<String, AuthenticationManager> managers = new HashMap<>();
-        for (String issuer : issuers) {
-            NimbusJwtDecoder decoder = JwtDecoders.fromIssuerLocation(issuer);
-            decoder.setClaimSetConverter(new UsernameSubClaimAdapter());
-            JwtAuthenticationProvider provider = new JwtAuthenticationProvider(decoder);
-            provider.setJwtAuthenticationConverter(jwtAuthenticationConverter());
-            managers.put(issuer, provider::authenticate);
-        }
+        var managers = Arrays.stream(issuers)
+                .collect(Collectors.toMap(issuer -> issuer, issuer -> {
+                    NimbusJwtDecoder decoder = JwtDecoders.fromIssuerLocation(issuer);
+                    decoder.setClaimSetConverter(new UsernameSubClaimAdapter());
+                    JwtAuthenticationProvider provider = new JwtAuthenticationProvider(decoder);
+                    provider.setJwtAuthenticationConverter(jwtAuthenticationConverter());
+                    return createManager(provider);
+                }));
         return new JwtIssuerAuthenticationManagerResolver(managers::get);
     }
 
+    private AuthenticationManager createManager(final JwtAuthenticationProvider provider) {
+        return provider::authenticate;
+    }
+
     JwtAuthenticationConverter jwtAuthenticationConverter() {
-        var converter = new JwtAuthenticationConverter();
+        final var converter = new JwtAuthenticationConverter();
         converter.setJwtGrantedAuthoritiesConverter(new KeycloakRoleScopeConverter());
         return converter;
     }
@@ -68,11 +73,10 @@ class WebSecurityJwtConfiguration {
 
         @Override
         public Map<String, Object> convert(Map<String, Object> claims) {
-            var convertedClaims = this.delegate.convert(claims);
-            var username = (String) convertedClaims.get("preferred_username");
+            final var convertedClaims = this.delegate.convert(claims);
+            final var username = (String) convertedClaims.get("preferred_username");
             convertedClaims.put("sub", username);
             return convertedClaims;
         }
-
     }
 }
