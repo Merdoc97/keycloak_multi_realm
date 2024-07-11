@@ -5,88 +5,88 @@ import com.example.keycloak_multi_realm.config.PlainJWTSecurityConfig;
 import lombok.SneakyThrows;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.reactive.server.WebTestClient;
 
 import java.util.Set;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 @SpringBootTest
 @Import(PlainJWTSecurityConfig.class)
-@AutoConfigureMockMvc
+@AutoConfigureWebTestClient
 class KeycloakMultiRealmApplicationTests {
 
     @Autowired
-    private MockMvc mockMvc;
+    private WebTestClient webTestClient;
     @Autowired
     private String[] issuers;
 
     @Test
     @SneakyThrows
     void testFullyAuthenticated() {
-        mockMvc.perform(get("/api/hello")
-                        .header("Authorization", JwtHelper.generateJwt("admin", Set.of("admin"), "openid", issuers[0])))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$").value("Hello"));
+        webTestClient.get()
+                .uri("/api/hello")
+                .header("Authorization", JwtHelper.generateJwt("admin", Set.of("admin"), "openid", issuers[0]))
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class).isEqualTo("Hello");
+
     }
 
     @Test
     @SneakyThrows
     void testFullyAuthenticatedWithoutHeader() {
-        mockMvc.perform(get("/api/hello"))
-                .andDo(print())
-                .andExpect(status().isUnauthorized());
+        webTestClient.get()
+                .uri("/api/hello")
+                .exchange()
+                .expectStatus().isUnauthorized();
     }
+
+
     @Test
     @SneakyThrows
     void testRoleProtectedEndpoint() {
-        mockMvc.perform(get("/api/role")
-                        .header("Authorization", JwtHelper.generateJwt("user", Set.of("user_role"), "openid", issuers[1])))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$").value("Hello role"));
+        webTestClient.get().uri("/api/role")
+                .header("Authorization", JwtHelper.generateJwt("user", Set.of("user_role"), "openid", issuers[1]))
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class).isEqualTo("Hello role");
     }
 
     @Test
     @SneakyThrows
     void testRoleProtectedEndpointWrongRole() {
-        mockMvc.perform(get("/api/role")
-                        .header("Authorization", JwtHelper.generateJwt("user", Set.of("wrong_role"), "openid", issuers[1])))
-                .andDo(print())
-                .andExpect(status().isForbidden());
+        webTestClient.get().uri("/api/role")
+                .header("Authorization", JwtHelper.generateJwt("user", Set.of("wrong_role"), "openid", issuers[1]))
+                .exchange()
+                .expectStatus().isForbidden();
     }
 
     @Test
     @SneakyThrows
     void testRoleProtectedEndpointWithoutToken() {
-        mockMvc.perform(get("/api/role"))
-                .andDo(print())
-                .andExpect(status().isUnauthorized());
+        webTestClient.get().uri("/api/role")
+                .exchange()
+                .expectStatus().isUnauthorized();
     }
 
     @Test
     @SneakyThrows
     void testScopeProtectedEndpoint() {
-        mockMvc.perform(get("/api/scope")
-                        .header("Authorization", JwtHelper.generateJwt("user", Set.of("user_role"), "openid some-scope", issuers[1])))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$").value("Hello scope"));
+        webTestClient.get().uri("/api/scope")
+                .header("Authorization", JwtHelper.generateJwt("user", Set.of("user_role"), "openid some-scope", issuers[1]))
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class).isEqualTo(("Hello scope"));
     }
 
     @Test
     @SneakyThrows
     void testScopeProtectedEndpointWrongScope() {
-        mockMvc.perform(get("/api/scope")
-                        .header("Authorization", JwtHelper.generateJwt("user", Set.of("user_role"), "openid", issuers[1])))
-                .andDo(print())
-                .andExpect(status().isForbidden());
+        webTestClient.get().uri("/api/scope")
+                .header("Authorization", JwtHelper.generateJwt("user", Set.of("user_role"), "openid", issuers[1]))
+                .exchange()
+                .expectStatus().isForbidden();
     }
 }

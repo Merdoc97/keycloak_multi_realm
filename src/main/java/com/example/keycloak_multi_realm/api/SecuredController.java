@@ -7,6 +7,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Mono;
 
 @RestController
 @RequestMapping("/api")
@@ -15,22 +16,22 @@ class SecuredController {
 
     @GetMapping("/hello")
     @PreAuthorize("isFullyAuthenticated()")
-    ResponseEntity<String> hello(JwtAuthenticationToken authenticationToken) {
+    Mono<String> hello(JwtAuthenticationToken authenticationToken) {
         log.info("Authorization {}", authenticationToken);
-        return ResponseEntity.ok("Hello");
+        return Mono.just(("Hello"));
     }
 
     @GetMapping("/role")
     @PreAuthorize("hasRole('user_role')")
-    ResponseEntity<String> roleProtectedEndpoint(JwtAuthenticationToken authenticationToken) {
+    Mono<ResponseEntity<String>> roleProtectedEndpoint(JwtAuthenticationToken authenticationToken) {
         log.info("Authorization {}", authenticationToken);
-        return ResponseEntity.ok("Hello role");
+        return Mono.just(ResponseEntity.ok("Hello role"));
     }
 
     @GetMapping("/scope")
     @PreAuthorize("hasAuthority('SCOPE_some-scope')")
-    ResponseEntity<String> scopeProtectedEndpoint(JwtAuthenticationToken authenticationToken) {
+    Mono<ResponseEntity<String>> scopeProtectedEndpoint(JwtAuthenticationToken authenticationToken) {
         log.info("Authorization {}", authenticationToken);
-        return ResponseEntity.ok("Hello scope");
+        return Mono.just(ResponseEntity.ok("Hello scope"));
     }
 }

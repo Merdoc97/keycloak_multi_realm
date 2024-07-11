@@ -1,8 +1,13 @@
 server:
   port: 8082
 spring:
+  main:
+    allow-bean-definition-overriding: true
   security:
     oauth2:
       resourceserver:
         jwt:
           issuers-uri: http://localhost:8081/realms/master,http://localhost:8081/realms/test-realm
+logging:
+  level:
+    root: info

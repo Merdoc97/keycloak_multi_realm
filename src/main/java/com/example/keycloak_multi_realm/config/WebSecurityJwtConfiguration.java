@@ -5,19 +5,21 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.AuthenticationManagerResolver;
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.oauth2.jwt.JwtDecoders;
+import org.springframework.security.authentication.ReactiveAuthenticationManager;
+import org.springframework.security.authentication.ReactiveAuthenticationManagerResolver;
+import org.springframework.security.config.annotation.method.configuration.EnableReactiveMethodSecurity;
+import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
+import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.oauth2.jwt.MappedJwtClaimSetConverter;
-import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
+import org.springframework.security.oauth2.jwt.ReactiveJwtDecoders;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationProvider;
-import org.springframework.security.oauth2.server.resource.authentication.JwtIssuerAuthenticationManagerResolver;
-import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.oauth2.server.resource.authentication.JwtIssuerReactiveAuthenticationManagerResolver;
+import org.springframework.security.oauth2.server.resource.authentication.JwtReactiveAuthenticationManager;
+import org.springframework.security.oauth2.server.resource.authentication.ReactiveJwtAuthenticationConverterAdapter;
+import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.security.web.server.context.NoOpServerSecurityContextRepository;
+import reactor.core.publisher.Mono;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -25,44 +27,47 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Configuration
-@EnableWebSecurity
-@EnableMethodSecurity
+@EnableWebFluxSecurity
+@EnableReactiveMethodSecurity
 class WebSecurityJwtConfiguration {
 
     @Value("${spring.security.oauth2.resourceserver.jwt.issuers-uri}")
     private String[] issuers;
 
     @Bean
-    SecurityFilterChain configure(final HttpSecurity http, final AuthenticationManagerResolver issuerResolver) throws Exception {
+    SecurityWebFilterChain configure(final ServerHttpSecurity http, final ReactiveAuthenticationManagerResolver issuerResolver) throws Exception {
         http
-                .csrf().disable()
-                .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                .and()
-                .anonymous()
-                .and()
-                .authorizeHttpRequests((auth) -> auth
-                        .anyRequest().authenticated())
-                .oauth2ResourceServer(oauth2 -> oauth2
-                        .authenticationManagerResolver(issuerResolver));
-
+                .csrf(ServerHttpSecurity.CsrfSpec::disable)
+                .anonymous(ServerHttpSecurity.AnonymousSpec::disable)
+                .oauth2ResourceServer(oauth2 -> oauth2.authenticationManagerResolver(issuerResolver))
+                .securityContextRepository(NoOpServerSecurityContextRepository.getInstance())
+                .authorizeExchange(authorizeExchangeSpec -> authorizeExchangeSpec.anyExchange().authenticated());
         return http.build();
+
     }
 
     @Bean
     @ConditionalOnMissingBean
-    AuthenticationManagerResolver issuerResolver(JwtAuthenticationConverter jwtAuthenticationConverter, String[] issuers) {
+    ReactiveAuthenticationManagerResolver issuerResolver(JwtAuthenticationConverter jwtAuthenticationConverter, String[] issuers) {
         final var managers = Arrays.stream(issuers)
                 .collect(Collectors.toMap(issuer -> issuer, issuer -> {
-                    final NimbusJwtDecoder decoder = JwtDecoders.fromIssuerLocation(issuer);
+                    final NimbusReactiveJwtDecoder decoder = (NimbusReactiveJwtDecoder) ReactiveJwtDecoders.fromIssuerLocation(issuer);
                     decoder.setClaimSetConverter(new UsernameSubClaimAdapter());
-                    final var provider = new JwtAuthenticationProvider(decoder);
-                    provider.setJwtAuthenticationConverter(jwtAuthenticationConverter);
+                    var provider = new JwtReactiveAuthenticationManager(decoder);
+                    provider.setJwtAuthenticationConverter(new ReactiveJwtAuthenticationConverterAdapter(jwtAuthenticationConverter));
                     return createManager(provider);
                 }));
-        return new JwtIssuerAuthenticationManagerResolver(managers::get);
+
+        return new JwtIssuerReactiveAuthenticationManagerResolver(delegate(managers));
+
     }
 
-    private AuthenticationManager createManager(final JwtAuthenticationProvider provider) {
+    private ReactiveAuthenticationManagerResolver<String> delegate(Map<String, ReactiveAuthenticationManager> managers) {
+        return issuer -> Mono.just(managers.get(issuer));
+
+    }
+
+    private ReactiveAuthenticationManager createManager(final JwtReactiveAuthenticationManager provider) {
         return provider::authenticate;
     }
 
