@@ -1,10 +1,12 @@
 package com.example.keycloak_multi_realm.config;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.AuthenticationManagerResolver;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -31,7 +33,7 @@ class WebSecurityJwtConfiguration {
     private String[] issuers;
 
     @Bean
-    SecurityFilterChain configure(final HttpSecurity http) throws Exception {
+    SecurityFilterChain configure(final HttpSecurity http, final AuthenticationManagerResolver issuerResolver) throws Exception {
         http
                 .csrf().disable()
                 .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
@@ -41,18 +43,20 @@ class WebSecurityJwtConfiguration {
                 .authorizeHttpRequests((auth) -> auth
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
-                        .authenticationManagerResolver(issuerResolver()));
+                        .authenticationManagerResolver(issuerResolver));
 
         return http.build();
     }
 
-    JwtIssuerAuthenticationManagerResolver issuerResolver() {
+    @Bean
+    @ConditionalOnMissingBean
+    AuthenticationManagerResolver issuerResolver(JwtAuthenticationConverter jwtAuthenticationConverter, String[] issuers) {
         final var managers = Arrays.stream(issuers)
                 .collect(Collectors.toMap(issuer -> issuer, issuer -> {
                     final NimbusJwtDecoder decoder = JwtDecoders.fromIssuerLocation(issuer);
                     decoder.setClaimSetConverter(new UsernameSubClaimAdapter());
                     final var provider = new JwtAuthenticationProvider(decoder);
-                    provider.setJwtAuthenticationConverter(jwtAuthenticationConverter());
+                    provider.setJwtAuthenticationConverter(jwtAuthenticationConverter);
                     return createManager(provider);
                 }));
         return new JwtIssuerAuthenticationManagerResolver(managers::get);
@@ -62,13 +66,14 @@ class WebSecurityJwtConfiguration {
         return provider::authenticate;
     }
 
+    @Bean
     JwtAuthenticationConverter jwtAuthenticationConverter() {
         final var converter = new JwtAuthenticationConverter();
         converter.setJwtGrantedAuthoritiesConverter(new KeycloakRoleScopeConverter());
         return converter;
     }
 
-    private static class UsernameSubClaimAdapter implements Converter<Map<String, Object>, Map<String, Object>> {
+    public static class UsernameSubClaimAdapter implements Converter<Map<String, Object>, Map<String, Object>> {
         private final MappedJwtClaimSetConverter delegate = MappedJwtClaimSetConverter.withDefaults(Collections.emptyMap());
 
         @Override
@@ -78,5 +83,10 @@ class WebSecurityJwtConfiguration {
             convertedClaims.put("sub", username);
             return convertedClaims;
         }
+    }
+
+    @Bean
+    String[] issuers() {
+        return issuers;
     }
 }

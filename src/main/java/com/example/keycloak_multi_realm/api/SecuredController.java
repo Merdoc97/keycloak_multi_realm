@@ -22,14 +22,14 @@ class SecuredController {
 
     @GetMapping("/role")
     @PreAuthorize("hasRole('user_role')")
-    ResponseEntity<String>roleProtectedEndpoint(JwtAuthenticationToken authenticationToken){
+    ResponseEntity<String> roleProtectedEndpoint(JwtAuthenticationToken authenticationToken) {
         log.info("Authorization {}", authenticationToken);
         return ResponseEntity.ok("Hello role");
     }
 
     @GetMapping("/scope")
     @PreAuthorize("hasAuthority('SCOPE_some-scope')")
-    ResponseEntity<String>scopeProtectedEndpoint(JwtAuthenticationToken authenticationToken){
+    ResponseEntity<String> scopeProtectedEndpoint(JwtAuthenticationToken authenticationToken) {
         log.info("Authorization {}", authenticationToken);
         return ResponseEntity.ok("Hello scope");
     }
